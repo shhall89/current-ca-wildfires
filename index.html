@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Load data from an external GeoJSON file</title>
+    <title>Current CA Wildfires</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
@@ -16,7 +16,7 @@
         #container {
             display: flex;
             height: 100vh;
-            flex-direction: row;
+            flex-direction: row-reverse;
             align-items: stretch;
         }
 
@@ -32,6 +32,7 @@
         button {
             margin-bottom: 10px;
         }
+
         table {
             border-collapse: collapse;
             border-spacing: 0;
@@ -48,6 +49,14 @@
         tr:nth-child(even) {
             background-color: #f2f2f2;
         }
+
+        @media screen and (max-width: 1024px) {
+
+            /* Hide all links, except for the selected tab */
+            #table {
+                display: none;
+            }
+        }
     </style>
 </head>
 
@@ -55,15 +64,15 @@
     <main id="container">
         <div id="table">
 
-            <h2>Earthquake List</h2>
-            <button onclick="sortTable()">Sort by Magnitude</button>
-            
+            <h2>Wildfire List</h2>
+            <button onclick="sortTable()">Sort by Acres Burned</button>
+
 
             <table>
                 <tr>
-                    <th>id</th>
-                    <th>magnitude</th>
-                    <th>timestamp</th>
+                    <th>Name</th>
+                    <th>Acres Burned</th>
+                    <th>% Contained</th>
                 </tr>
             </table>
 
@@ -73,42 +82,49 @@
     </main>
     <script>
         mapboxgl.accessToken =
-            'pk.eyJ1IjoiamFrb2J6aGFvIiwiYSI6ImNpcms2YWsyMzAwMmtmbG5icTFxZ3ZkdncifQ.P9MBej1xacybKcDN_jehvw';
+            'pk.eyJ1Ijoic2hhbGw4OSIsImEiOiJjbGRtamd0NDQwOXg2M29vOTl3NXY2NnUyIn0.-9cF6_Jg9mlwTbOc9rhRnQ';
         const map = new mapboxgl.Map({
             container: 'map', // container ID
-            style: 'mapbox://styles/mapbox/satellite-v9', // style URL
-            zoom: 5.5, // starting zoom
-            center: [138.043, 38] // starting center
+            // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+            style: 'mapbox://styles/mapbox/outdoors-v12', // style URL
+            center: [-119, 37], // starting position [lng, lat]
+            zoom: 5.25 // starting zoom
         });
 
 
         async function geojsonFetch() {
 
 
-            let response = await fetch('assets/earthquakes.geojson');
+            let response = await fetch('assets/curr-fires.geojson');
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            let earthquakes = await response.json();
+            let fires = await response.json();
 
 
-            response = await fetch('assets/japan.json');
+            response = await fetch('assets/ca-counties.geojson');
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            let japan = await response.json();
+            let counties = await response.json();
 
 
             var table = document.getElementsByTagName("table");
-            for (let i = 0; i < earthquakes.features.length; i++) {
-                // console.log(earthquakes.features[i].properties.id);
 
-                var lng = await earthquakes.features[i].geometry.coordinates[0];
-                var lat = await earthquakes.features[i].geometry.coordinates[1];
+
+
+
+            for (let i = 0; i < fires.features.length; i++) {
+                // console.log(earthquakes.features[i].properties.id);
+                //console.log(fires.features)
+
+
+                var lng = await fires.features[i].geometry.coordinates[0];
+                var lat = await fires.features[i].geometry.coordinates[1];
 
                 // Create an empty <tr> element and add it to the 1st position of the table:
                 var row = table[0].insertRow(-1);
@@ -116,9 +132,19 @@
                 var cell1 = row.insertCell(0);
                 var cell2 = row.insertCell(1);
                 var cell3 = row.insertCell(2);
-                cell1.innerHTML = await earthquakes.features[i].properties.id;
-                cell2.innerHTML = await earthquakes.features[i].properties.mag;
-                cell3.innerHTML = await new Date(earthquakes.features[i].properties.time).toLocaleDateString("en-US");
+                cell1.innerHTML = await fires.features[i].properties.Name;
+                if (await fires.features[i].properties.AcresBurned == null) {
+                    cell2.innerHTML = 0;
+                } else {
+                    cell2.innerHTML = await fires.features[i].properties.AcresBurned;
+                }
+                if (await fires.features[i].properties.PercentContained == null) {
+                    cell3.innerHTML = "Currently Active";
+
+                } else {
+                    cell3.innerHTML = await fires.features[i].properties.PercentContained;
+                }
+
 
             }
 
@@ -129,15 +155,15 @@
 
 
 
-                map.addSource('earthquakes', {
+                map.addSource('fires', {
                     type: 'geojson',
-                    data: earthquakes
+                    data: fires
                 });
 
                 map.addLayer({
-                    'id': 'earthquakes-layer',
+                    'id': 'fires-layer',
                     'type': 'circle',
-                    'source': 'earthquakes',
+                    'source': 'fires',
                     'paint': {
                         'circle-radius': 8,
                         'circle-stroke-width': 2,
@@ -147,15 +173,15 @@
                 });
 
 
-                map.addSource('japan', {
+                map.addSource('counties', {
                     type: 'geojson',
-                    data: japan
+                    data: counties
                 });
 
                 map.addLayer({
-                    'id': 'japan-layer',
+                    'id': 'counties-layer',
                     'type': 'fill',
-                    'source': 'japan',
+                    'source': 'counties',
                     'paint': {
                         'fill-color': '#0080ff', // blue color fill
                         'fill-opacity': 0.5
@@ -199,6 +225,8 @@
                     /*Get the two elements you want to compare,
                     one from current row and one from the next:*/
                     x = parseFloat(rows[i].getElementsByTagName("td")[1].innerHTML);
+
+
                     y = parseFloat(rows[i + 1].getElementsByTagName("td")[1].innerHTML);
                     //check if the two rows should switch place:
                     if (x < y) {
@@ -216,6 +244,7 @@
             }
         }
     </script>
+
 
 </body>
 
